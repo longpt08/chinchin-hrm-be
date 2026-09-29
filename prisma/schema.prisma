@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  users       User[]
+
+  @@map("roles")
+}
+
+model User {
+  id                    String                   @id @default(uuid()) @db.Uuid
+  name                  String
+  phone                 String                   @unique
+  password_hash         String
+  role_id               String                   @db.Uuid
+  role                  Role                     @relation(fields: [role_id], references: [id])
+  employment_type       String
+  contract_type         String
+  onboard_date          DateTime                 @db.Date
+  probation_end_date    DateTime?                @db.Date
+  official_contract_date DateTime?               @db.Date
+  avatar_url            String?
+  base_salary           Decimal                  @db.Decimal(15, 2)
+  probation_salary      Decimal?                 @db.Decimal(15, 2)
+  is_active             Boolean                  @default(true)
+  is_fired              Boolean                  @default(false)
+  time_logs             TimeLog[]
+  shifts                Shift[]
+  salary_adjustments    SalaryAdjustment[]
+  payslips              Payslip[]
+  schedule_requests     ScheduleRequest[]
+  acknowledgements      ArticleAcknowledgement[]
+
+  @@map("users")
+}
+
+model TimeLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String   @db.Uuid
+  user       User     @relation(fields: [user_id], references: [id])
+  log_type   String   // IN or OUT
+  timestamp  DateTime @db.Timestamptz
+  status     String?  // on_time, late, early_leave
+  photo_url  String?
+
+  @@map("time_logs")
+}
+
+model ShiftTemplate {
+  id                   String              @id @default(uuid()) @db.Uuid
+  name                 String
+  start_time           DateTime            @db.Time
+  end_time             DateTime            @db.Time
+  allowed_late_minutes Int
+  is_active            Boolean             @default(true)
+  order                Int                 @default(0)
+  shifts               Shift[]
+  shift_requirements   ShiftRequirement[]
+
+  @@map("shift_templates")
+}
+
+model Shift {
+  id          String         @id @default(uuid()) @db.Uuid
+  user_id     String         @db.Uuid
+  user        User           @relation(fields: [user_id], references: [id])
+  template_id String?        @db.Uuid
+  template    ShiftTemplate? @relation(fields: [template_id], references: [id])
+  date        DateTime       @db.Date
+  start_time  DateTime       @db.Time
+  end_time    DateTime       @db.Time
+  status      String         // draft, registered, published
+
+  @@map("shifts")
+}
+
+model ShiftRequirement {
+  id             String        @id @default(uuid()) @db.Uuid
+  template_id    String        @db.Uuid
+  template       ShiftTemplate @relation(fields: [template_id], references: [id])
+  day_of_week    Int           // 0=Sunday, 1=Monday...
+  required_count Int
+
+  @@map("shift_requirements")
+}
+
+model SalaryAdjustment {
+  id          String   @id @default(uuid()) @db.Uuid
+  user_id     String   @db.Uuid
+  user        User     @relation(fields: [user_id], references: [id])
+  type        String   // allowance, punishment, advance
+  amount      Decimal  @db.Decimal(15, 2)
+  date        DateTime @db.Date
+  description String?
+
+  @@map("salary_adjustments")
+}
+
+model ScheduleSetting {
+  id                  String  @id @default(uuid()) @db.Uuid
+  is_request_reopened Boolean @default(false)
+
+  @@map("schedule_settings")
+}
+
+model ScheduleRequest {
+  id               String   @id @default(uuid()) @db.Uuid
+  user_id          String   @db.Uuid
+  user             User     @relation(fields: [user_id], references: [id])
+  week_start       DateTime @db.Date
+  requested_shifts Json
+
+  @@map("schedule_requests")
+}
+
+model Payslip {
+  id           String   @id @default(uuid()) @db.Uuid
+  user_id      String   @db.Uuid
+  user         User     @relation(fields: [user_id], references: [id])
+  month        Int
+  year         Int
+  base_salary  Decimal  @db.Decimal(15, 2)
+  total_hours  Decimal  @db.Decimal(10, 2)
+  allowances   Decimal  @db.Decimal(15, 2)
+  punishments  Decimal  @db.Decimal(15, 2)
+  advances     Decimal  @db.Decimal(15, 2)
+  final_total  Decimal  @db.Decimal(15, 2)
+  status       String
+
+  @@map("payslips")
+}
+
+model PunishmentTemplate {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String
+  amount      Decimal @db.Decimal(15, 2)
+  add_to_fund Boolean @default(true)
+
+  @@map("punishment_templates")
+}
+
+model FundLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  type        String
+  amount      Decimal  @db.Decimal(15, 2)
+  description String?
+  created_at  DateTime @default(now()) @db.Timestamptz
+
+  @@map("fund_logs")
+}
+
+model HandbookArticle {
+  id               String                   @id @default(uuid()) @db.Uuid
+  title            String
+  category         String
+  content          String                   @db.Text
+  target_roles     String[]                 @default([])
+  status           String
+  created_at       DateTime                 @default(now()) @db.Timestamptz
+  updated_at       DateTime                 @updatedAt @db.Timestamptz
+  acknowledgements ArticleAcknowledgement[]
+
+  @@map("handbook_articles")
+}
+
+model ArticleAcknowledgement {
+  id              String          @id @default(uuid()) @db.Uuid
+  article_id      String          @db.Uuid
+  article         HandbookArticle @relation(fields: [article_id], references: [id])
+  user_id         String          @db.Uuid
+  user            User            @relation(fields: [user_id], references: [id])
+  acknowledged_at DateTime        @default(now()) @db.Timestamptz
+
+  @@map("article_acknowledgements")
+}
